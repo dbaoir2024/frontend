@@ -1,138 +1,216 @@
-// Authentication service for the OIR Dashboard application
-// Handles user authentication, registration, and session management
-
+// Authentication service for handling login, logout, and token management
 import ApiService from './api.service';
-import { User, AuthState } from '../types';
+import { API_ENDPOINTS } from '../config/api';
+import { User, ApiResponse } from '../types';
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterData {
+  username: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  positionId: number;
+  roleId?: number;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
+}
+
+export interface GoogleLoginData {
+  token: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export interface ChangePasswordData {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordData {
+  token: string;
+  newPassword: string;
+}
 
 class AuthService {
   // Login with email and password
-  static async login(email: string, password: string): Promise<AuthState> {
+  static async login(credentials: LoginCredentials): Promise<ApiResponse<LoginResponse>> {
     try {
-      const response = await ApiService.post<{ user: User; token: string }>('/auth/login', {
-        email,
-        password,
-      });
-
+      const response = await ApiService.post<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, credentials);
+      
       if (response.success && response.data) {
-        // Store token and user in local storage
+        // Store token and user data in localStorage
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-
-        return {
-          user: response.data.user,
-          token: response.data.token,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        };
       }
-
-      return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: response.error || 'Login failed',
-      };
+      
+      return response;
     } catch (error) {
       return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Login failed. Please try again.',
-      };
-    }
-  }
-
-  // Login with Google
-  static async loginWithGoogle(token: string): Promise<AuthState> {
-    try {
-      const response = await ApiService.post<{ user: User; token: string }>('/auth/google', {
-        token,
-      });
-
-      if (response.success && response.data) {
-        // Store token and user in local storage
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-
-        return {
-          user: response.data.user,
-          token: response.data.token,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        };
-      }
-
-      return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: response.error || 'Google login failed',
-      };
-    } catch (error) {
-      return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Google login failed. Please try again.',
+        success: false,
+        error: 'Login failed. Please try again.'
       };
     }
   }
 
   // Register new user
-  static async register(userData: {
-    username: string;
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    positionId: number;
-  }): Promise<AuthState> {
+  static async register(userData: RegisterData): Promise<ApiResponse<LoginResponse>> {
     try {
-      const response = await ApiService.post<{ user: User; token: string }>('/auth/register', userData);
-
+      const response = await ApiService.post<LoginResponse>(API_ENDPOINTS.AUTH.REGISTER, userData);
+      
       if (response.success && response.data) {
-        // Store token and user in local storage
+        // Store token and user data in localStorage
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-
-        return {
-          user: response.data.user,
-          token: response.data.token,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        };
       }
-
-      return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: response.error || 'Registration failed',
-      };
+      
+      return response;
     } catch (error) {
       return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Registration failed. Please try again.',
+        success: false,
+        error: 'Registration failed. Please try again.'
       };
     }
   }
 
-  // Logout user
+  // Google login
+  static async googleLogin(googleData: GoogleLoginData): Promise<ApiResponse<LoginResponse>> {
+    try {
+      const response = await ApiService.post<LoginResponse>(API_ENDPOINTS.AUTH.GOOGLE_LOGIN, googleData);
+      
+      if (response.success && response.data) {
+        // Store token and user data in localStorage
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Google login failed. Please try again.'
+      };
+    }
+  }
+
+  // Verify token
+  static async verifyToken(): Promise<ApiResponse<User>> {
+    try {
+      return await ApiService.get<User>(API_ENDPOINTS.AUTH.VERIFY_TOKEN);
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Token verification failed.'
+      };
+    }
+  }
+
+  // Get user profile
+  static async getProfile(): Promise<ApiResponse<User>> {
+    try {
+      return await ApiService.get<User>(API_ENDPOINTS.AUTH.PROFILE);
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to fetch profile.'
+      };
+    }
+  }
+
+  // Update user profile
+  static async updateProfile(profileData: Partial<User>): Promise<ApiResponse<User>> {
+    try {
+      const response = await ApiService.put<User>(API_ENDPOINTS.AUTH.PROFILE, profileData);
+      
+      if (response.success && response.data) {
+        // Update stored user data
+        localStorage.setItem('user', JSON.stringify(response.data));
+      }
+      
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to update profile.'
+      };
+    }
+  }
+
+  // Change password
+  static async changePassword(passwordData: ChangePasswordData): Promise<ApiResponse<any>> {
+    try {
+      return await ApiService.post<any>(API_ENDPOINTS.AUTH.CHANGE_PASSWORD, passwordData);
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to change password.'
+      };
+    }
+  }
+
+  // Request password reset
+  static async requestPasswordReset(email: string): Promise<ApiResponse<any>> {
+    try {
+      return await ApiService.post<any>(API_ENDPOINTS.AUTH.REQUEST_RESET, { email });
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to request password reset.'
+      };
+    }
+  }
+
+  // Reset password with token
+  static async resetPassword(resetData: ResetPasswordData): Promise<ApiResponse<any>> {
+    try {
+      return await ApiService.post<any>(API_ENDPOINTS.AUTH.RESET_PASSWORD, resetData);
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to reset password.'
+      };
+    }
+  }
+
+  // Get all roles
+  static async getRoles(): Promise<ApiResponse<any[]>> {
+    try {
+      return await ApiService.get<any[]>(API_ENDPOINTS.AUTH.ROLES);
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to fetch roles.'
+      };
+    }
+  }
+
+  // Get all positions
+  static async getPositions(): Promise<ApiResponse<any[]>> {
+    try {
+      return await ApiService.get<any[]>(API_ENDPOINTS.AUTH.POSITIONS);
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to fetch positions.'
+      };
+    }
+  }
+
+  // Logout
   static logout(): void {
-    // Remove token and user from local storage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Redirect to login page
+    window.location.href = '/';
   }
 
   // Check if user is authenticated
@@ -141,125 +219,25 @@ class AuthService {
     return !!token;
   }
 
-  // Get current user
+  // Get current user from localStorage
   static getCurrentUser(): User | null {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
-        return JSON.parse(userStr) as User;
+        return JSON.parse(userStr);
       } catch (error) {
+        console.error('Error parsing user data:', error);
         return null;
       }
     }
     return null;
   }
 
-  // Get authentication token
+  // Get current token
   static getToken(): string | null {
     return localStorage.getItem('token');
-  }
-
-  // Verify token validity
-  static async verifyToken(): Promise<AuthState> {
-    try {
-      const response = await ApiService.get<User>('/auth/verify');
-
-      if (response.success && response.data) {
-        // Update user in local storage
-        localStorage.setItem('user', JSON.stringify(response.data));
-
-        return {
-          user: response.data,
-          token: this.getToken(),
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        };
-      }
-
-      // Token is invalid, clear storage
-      this.logout();
-
-      return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: response.error || 'Session expired',
-      };
-    } catch (error) {
-      // Error verifying token, clear storage
-      this.logout();
-
-      return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Session verification failed',
-      };
-    }
-  }
-
-  // Request password reset
-  static async requestPasswordReset(email: string): Promise<boolean> {
-    try {
-      const response = await ApiService.post<{ success: boolean }>('/auth/request-reset', { email });
-      return response.success;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  // Reset password with token
-  static async resetPassword(token: string, newPassword: string): Promise<boolean> {
-    try {
-      const response = await ApiService.post<{ success: boolean }>('/auth/reset-password', {
-        token,
-        newPassword,
-      });
-      return response.success;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  // Change password
-  static async changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
-    try {
-      const response = await ApiService.post<{ success: boolean }>('/auth/change-password', {
-        currentPassword,
-        newPassword,
-      });
-      return response.success;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  // Update user profile
-  static async updateProfile(userData: Partial<User>): Promise<User | null> {
-    try {
-      const response = await ApiService.put<User>('/auth/profile', userData);
-
-      if (response.success && response.data) {
-        // Get current user from storage
-        const currentUser = this.getCurrentUser();
-        
-        // Update user in local storage
-        if (currentUser) {
-          const updatedUser = { ...currentUser, ...response.data };
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-        }
-
-        return response.data;
-      }
-
-      return null;
-    } catch (error) {
-      return null;
-    }
   }
 }
 
 export default AuthService;
+
